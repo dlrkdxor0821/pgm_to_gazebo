@@ -6,13 +6,14 @@ self-contained `world.sdf`로 바꿔주는 대화형 도구.
 ## 빠른 시작
 
 ```bash
-# 1) pgm/ 에 map.pgm 과 map.yaml 을 한 쌍으로 넣는다
-cp /path/to/office.pgm  pgm/
-cp /path/to/office.yaml pgm/
+# 1) pgm/ 안에 지도 "폴더" 를 만들고 map.pgm 과 map.yaml 을 함께 넣는다
+mkdir -p pgm/office
+cp /path/to/office.pgm  pgm/office/
+cp /path/to/office.yaml pgm/office/
 
 # 2) 대화형 변환 실행
 ./scripts/pgm-to-gazebo.sh
-#   → pgm/ 목록에서 번호 선택 → 출력 이름 입력 → world/<이름>.sdf 생성
+#   → pgm/ 의 폴더 목록에서 번호 선택 → 출력 이름 입력 → world/<이름>.sdf 생성
 
 # 3) Gazebo 로 확인
 gz sim world/office.sdf
@@ -21,10 +22,17 @@ gz sim world/office.sdf
 ## 폴더 구조
 
 ```
-pgm/      입력: map.pgm + map.yaml 쌍   (내용물은 git 추적 안 함)
-world/    출력: 생성된 world.sdf        (내용물은 git 추적 안 함)
-scripts/  pgm-to-gazebo.sh (대화형) + pgm_to_world.py (변환 엔진)
+pgm/            입력: 지도 폴더들           (내용물은 git 추적 안 함)
+  office/         map.pgm + map.yaml 한 쌍
+  lab/            map.pgm + map.yaml 한 쌍
+world/          출력: 생성된 world.sdf      (내용물은 git 추적 안 함)
+scripts/        pgm-to-gazebo.sh (대화형) + pgm_to_world.py (변환 엔진)
 ```
+
+지도는 **폴더 단위**로 관리한다. `pgm/` 바로 아래 흩어진 파일은 무시되고,
+하위 폴더만 변환 후보로 인식된다. 스크립트는 각 폴더에서 `map.yaml` 을 찾아
+yaml 의 `image:` 필드가 가리키는 pgm 이 같은 폴더에 실제로 있는지(yaml↔pgm 일치)
+검사한 뒤 목록에 `✓` / `⚠` 로 표시한다.
 
 ## 변환 원리
 
