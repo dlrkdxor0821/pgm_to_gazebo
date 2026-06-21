@@ -13,7 +13,8 @@ cp /path/to/office.yaml pgm/office/
 
 # 2) 대화형 변환 실행
 ./scripts/pgm-to-gazebo.sh
-#   → pgm/ 의 폴더 목록에서 번호 선택 → 출력 이름 입력 → world/<이름>.sdf 생성
+#   → pgm/ 의 폴더 목록에서 번호 선택 → 출력 이름 입력
+#   → world/<이름>.sdf 생성 + png/<폴더>/<이름>.png 자동 동반 생성
 
 # 3) Gazebo 로 확인
 gz sim world/office.sdf
@@ -26,8 +27,14 @@ pgm/            입력: 지도 폴더들           (내용물은 git 추적 안 
   office/         map.pgm + map.yaml 한 쌍
   lab/            map.pgm + map.yaml 한 쌍
 world/          출력: 생성된 world.sdf      (내용물은 git 추적 안 함)
+png/            출력: pgm 의 png 사본        (변환 시 자동 동반, git 추적 안 함)
+  office/         map.png
 scripts/        pgm-to-gazebo.sh (대화형) + pgm_to_world.py (변환 엔진)
 ```
+
+변환을 한 번 돌리면 `world/<이름>.sdf` 와 함께 `png/<폴더>/<pgm이름>.png` 도
+**같이** 만들어진다. png 는 pgm 픽셀을 1:1 로 옮긴 8-bit grayscale 이라 일반
+이미지 뷰어/도구로 점유격자 지도를 바로 열어볼 수 있다 (새 의존성 없이 stdlib 로 생성).
 
 지도는 **폴더 단위**로 관리한다. `pgm/` 바로 아래 흩어진 파일은 무시되고,
 하위 폴더만 변환 후보로 인식된다. 스크립트는 각 폴더에서 `map.yaml` 을 찾아

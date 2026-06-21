@@ -1,8 +1,10 @@
-# pgm/ 와 world/ 내용물은 추적하지 않음 (.gitkeep 은 예외)
+# pgm/ 와 world/ 와 png/ 내용물은 추적하지 않음 (.gitkeep 은 예외)
 pgm/*
 world/*
+png/*
 !pgm/.gitkeep
 !world/.gitkeep
+!png/.gitkeep
 
 # python
 __pycache__/

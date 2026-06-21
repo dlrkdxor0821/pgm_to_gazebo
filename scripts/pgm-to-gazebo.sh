@@ -8,8 +8,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PGM_DIR="$REPO_DIR/pgm"
 WORLD_DIR="$REPO_DIR/world"
+PNG_DIR="$REPO_DIR/png"
 
-mkdir -p "$WORLD_DIR"
+mkdir -p "$WORLD_DIR" "$PNG_DIR"
 
 # yaml 의 image: 필드 값을 추출 (앞뒤 따옴표 제거). 없으면 빈 문자열.
 extract_image_field() {
@@ -84,6 +85,11 @@ if ! result="$(inspect_folder "$sel_dir")"; then
     exit 1
 fi
 sel_yaml="${result%%|*}"
+sel_pgm="${result#*|}"
+
+# png 는 pgm 소스 폴더 구조를 거울처럼 따른다: png/<폴더>/<pgm이름>.png
+pgm_base="$(basename "$sel_pgm")"
+png_out="$PNG_DIR/$sel_name/${pgm_base%.*}.png"
 
 # 출력 이름 입력
 read -rp "출력 world 이름 (엔터 시 '$sel_name'): " out_name
@@ -99,8 +105,10 @@ if [ -f "$out_path" ]; then
     esac
 fi
 
-# 변환 실행
+# 변환 실행 (world.sdf 와 png 를 한 번에 같이 생성)
 echo "--- 변환 중 ---"
-python3 "$SCRIPT_DIR/pgm_to_world.py" --map "$sel_yaml" --out "$out_path"
-echo "--- 완료: $out_path ---"
+python3 "$SCRIPT_DIR/pgm_to_world.py" --map "$sel_yaml" --out "$out_path" --png "$png_out"
+echo "--- 완료 ---"
+echo "  world: $out_path"
+echo "  png  : $png_out"
 echo "Gazebo 실행 예: gz sim \"$out_path\""

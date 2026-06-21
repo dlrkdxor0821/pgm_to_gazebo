@@ -85,3 +85,71 @@ def test_main_end_to_end(tmp_path):
     root = ET.fromstring(out.read_text())
     assert root.tag == "sdf"
     assert "<box>" in out.read_text()
+
+
+import struct
+import zlib
+
+
+def _read_png_gray(path):
+    """테스트용 8-bit grayscale PNG 디코더 (filter 0 만 가정)."""
+    data = Path(path).read_bytes()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    pos = 8
+    width = height = bitdepth = colortype = None
+    idat = b""
+    while pos < len(data):
+        (length,) = struct.unpack(">I", data[pos : pos + 4])
+        tag = data[pos + 4 : pos + 8]
+        body = data[pos + 8 : pos + 8 + length]
+        pos += 12 + length
+        if tag == b"IHDR":
+            width, height, bitdepth, colortype = struct.unpack(">IIBB", body[:10])
+        elif tag == b"IDAT":
+            idat += body
+        elif tag == b"IEND":
+            break
+    raw = zlib.decompress(idat)
+    rows = []
+    for r in range(height):
+        start = r * (width + 1)
+        assert raw[start] == 0  # filter type 0 (None)
+        rows.append(list(raw[start + 1 : start + 1 + width]))
+    return width, height, bitdepth, colortype, np.array(rows, dtype=np.uint8)
+
+
+def test_write_png_preserves_grayscale_pixels(tmp_path):
+    arr = np.array([[0, 50, 254], [205, 128, 0]], dtype=np.uint8)
+    out = tmp_path / "x.png"
+    p2w.write_png(arr, out)
+    w, h, bitdepth, colortype, got = _read_png_gray(out)
+    assert (w, h) == (3, 2)
+    assert bitdepth == 8 and colortype == 0  # 8-bit grayscale
+    assert np.array_equal(got, arr)
+
+
+def test_write_png_creates_parent_dirs(tmp_path):
+    arr = np.zeros((2, 2), dtype=np.uint8)
+    out = tmp_path / "nested" / "deep" / "x.png"
+    p2w.write_png(arr, out)
+    assert out.is_file()
+
+
+def test_main_writes_png_alongside_world_when_requested(tmp_path):
+    arr = np.full((5, 5), 254, dtype=np.uint8)
+    arr[2, 2] = 0
+    pgm = tmp_path / "m.pgm"
+    _write_pgm(pgm, arr)
+    yaml_path = tmp_path / "m.yaml"
+    yaml_path.write_text(
+        "image: m.pgm\nresolution: 0.05\norigin: [0.0, 0.0, 0.0]\nfree_thresh: 0.196\n"
+    )
+    out = tmp_path / "out.sdf"
+    png = tmp_path / "png" / "m.png"
+    rc = p2w.main(["--map", str(yaml_path), "--out", str(out), "--png", str(png)])
+    assert rc == 0
+    assert out.is_file()
+    assert png.is_file()
+    w, h, _, _, got = _read_png_gray(png)
+    assert (w, h) == (5, 5)
+    assert np.array_equal(got, arr)  # pgm 픽셀이 png 에 1:1 보존

@@ -8,7 +8,9 @@ map.pgm + map.yaml 한 쌍을 받아 같은 좌표계의 world.sdf 를 생성한
 from __future__ import annotations
 
 import argparse
+import struct
 import sys
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -35,6 +37,37 @@ def read_pgm(path: Path) -> np.ndarray:
         int(f.readline().strip())  # maxval, 사용 안 함
         data = np.frombuffer(f.read(), dtype=np.uint8).reshape(h, w)
     return data
+
+
+def write_png(gray: np.ndarray, path: Path) -> None:
+    """uint8 grayscale 배열 → 8-bit grayscale PNG.
+
+    새 의존성 없이 stdlib(zlib + struct)만으로 인코딩한다. PGM 픽셀을 그대로
+    옮기므로 크기·회색값이 보존된다. (filter type 0, color type 0).
+    """
+    gray = np.ascontiguousarray(gray, dtype=np.uint8)
+    h, w = gray.shape
+    raw = bytearray()
+    for row in gray:
+        raw.append(0)  # 각 행 앞의 filter type 0 (None)
+        raw.extend(row.tobytes())
+
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(data))
+            + tag
+            + data
+            + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+        )
+
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 0, 0, 0, 0)  # 8-bit, grayscale
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
+        + chunk(b"IEND", b"")
+    )
 
 
 def runs_in_row(row: np.ndarray) -> set[tuple[int, int]]:
@@ -179,6 +212,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--map", required=True, type=Path, help="map.yaml 경로")
     p.add_argument("--out", required=True, type=Path, help="출력 world.sdf 경로")
     p.add_argument("--name", default=None, help="world name (기본: 출력 파일 stem)")
+    p.add_argument(
+        "--png", default=None, type=Path,
+        help="추가로 함께 저장할 PNG 경로 (PGM 픽셀 1:1, 선택)",
+    )
     args = p.parse_args(argv)
 
     map_yaml = args.map.resolve()
@@ -206,6 +243,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[input]  {pgm_path}")
     print(f"         {W}x{H} px @ {res} m/px  origin=({ox:.3f}, {oy:.3f})")
     print(f"         occupied: {int(occ_mask.sum())} px ({100 * occ_mask.mean():.2f}%)")
+
+    if args.png is not None:
+        png_path = args.png.resolve()
+        write_png(img, png_path)
+        print(f"[output] {png_path}")
 
     rects = decompose_to_rects(occ_mask)
     rects_world: list[tuple[float, float, float, float]] = []
